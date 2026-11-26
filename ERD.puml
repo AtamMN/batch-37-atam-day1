@@ -1,0 +1,245 @@
+
+@startuml HR_Core_ERD
+
+' ==============================
+' CONFIGURATION
+' ==============================
+
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam entity {
+    BackgroundColor #F8FAFC
+    BorderColor #64748B
+    FontColor #1E293B
+}
+skinparam ArrowColor #64748B
+
+title HR-Core - Entity Relationship Diagram
+
+' ==================================================
+' MODULE 1: USERS MANAGEMENT (RBAC)
+' ==================================================
+
+package "01. Users Management (RBAC)" {
+
+    entity "enterprises" as enterprises {
+        * enterprise_id : BIGINT <<PK>>
+        --
+        * company_name : VARCHAR
+        * company_email : VARCHAR
+        * password_hash : VARCHAR
+        tax_number : VARCHAR
+        company_address : TEXT
+        status : VARCHAR
+        created_at : TIMESTAMP
+    }
+
+    entity "users" as users {
+        * user_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        * full_name : VARCHAR
+        * email : VARCHAR
+        * password_hash : VARCHAR
+        status : VARCHAR
+        last_login : TIMESTAMP
+        created_at : TIMESTAMP
+    }
+
+    entity "roles" as roles {
+        * role_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        * role_name : VARCHAR
+        description : TEXT
+    }
+
+    entity "permissions" as permissions {
+        * permission_id : BIGINT <<PK>>
+        --
+        * permission_name : VARCHAR
+        module : VARCHAR
+        description : TEXT
+    }
+
+    entity "user_roles" as user_roles {
+        * user_role_id : BIGINT <<PK>>
+        --
+        * user_id : BIGINT <<FK>>
+        * role_id : BIGINT <<FK>>
+        assigned_at : TIMESTAMP
+    }
+
+    entity "role_permissions" as role_permissions {
+        * role_permission_id : BIGINT <<PK>>
+        --
+        * role_id : BIGINT <<FK>>
+        * permission_id : BIGINT <<FK>>
+    }
+}
+
+' ==================================================
+' MODULE 2: HR
+' ==================================================
+
+package "02. HR Module" {
+
+    entity "departments" as departments {
+        * department_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        * department_name : VARCHAR
+        description : TEXT
+        status : VARCHAR
+    }
+
+    entity "positions" as positions {
+        * position_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        * position_name : VARCHAR
+        description : TEXT
+    }
+
+    entity "employees" as employees {
+        * employee_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        user_id : BIGINT <<FK, NULL>>
+        * department_id : BIGINT <<FK>>
+        * position_id : BIGINT <<FK>>
+        * employee_number : VARCHAR
+        * first_name : VARCHAR
+        * last_name : VARCHAR
+        date_of_birth : DATE
+        hire_date : DATE
+        employment_status : VARCHAR
+        employment_type : VARCHAR
+        base_salary : DECIMAL
+        bank_account : VARCHAR
+        created_at : TIMESTAMP
+    }
+}
+
+' ==================================================
+' MODULE 3: PAYROLL
+' ==================================================
+
+package "03. Payroll Module" {
+
+    entity "payroll_periods" as payroll_periods {
+        * period_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        * period_name : VARCHAR
+        * start_date : DATE
+        * end_date : DATE
+        payment_date : DATE
+        status : VARCHAR
+    }
+
+    entity "payroll_runs" as payroll_runs {
+        * payroll_run_id : BIGINT <<PK>>
+        --
+        * period_id : BIGINT <<FK>>
+        * enterprise_id : BIGINT <<FK>>
+        processed_by : BIGINT <<FK>>
+        run_number : VARCHAR
+        total_gross : DECIMAL
+        total_deduction : DECIMAL
+        total_net : DECIMAL
+        status : VARCHAR
+        processed_at : TIMESTAMP
+    }
+
+    entity "payroll_records" as payroll_records {
+        * payroll_record_id : BIGINT <<PK>>
+        --
+        * payroll_run_id : BIGINT <<FK>>
+        * employee_id : BIGINT <<FK>>
+        gross_salary : DECIMAL
+        total_deduction : DECIMAL
+        net_salary : DECIMAL
+        payment_status : VARCHAR
+        payment_date : DATE
+    }
+
+    entity "payroll_components" as payroll_components {
+        * component_id : BIGINT <<PK>>
+        --
+        * enterprise_id : BIGINT <<FK>>
+        * component_name : VARCHAR
+        * component_type : VARCHAR
+        description : TEXT
+        is_active : BOOLEAN
+    }
+
+    entity "payroll_items" as payroll_items {
+        * payroll_item_id : BIGINT <<PK>>
+        --
+        * payroll_record_id : BIGINT <<FK>>
+        * component_id : BIGINT <<FK>>
+        * amount : DECIMAL
+        description : TEXT
+    }
+
+    entity "payroll_milestones" as payroll_milestones {
+        * milestone_id : BIGINT <<PK>>
+        --
+        * payroll_run_id : BIGINT <<FK>>
+        * assigned_to : BIGINT <<FK>>
+        * milestone_name : VARCHAR
+        description : TEXT
+        due_date : DATE
+        completed_at : TIMESTAMP
+        status : VARCHAR
+        sequence_order : INT
+    }
+}
+
+' ==================================================
+' RELATIONSHIPS: USERS MANAGEMENT
+' ==================================================
+
+enterprises ||--o{ users : owns
+enterprises ||--o{ roles : defines
+users ||--o{ user_roles : assigned
+roles ||--o{ user_roles : contains
+roles ||--o{ role_permissions : grants
+permissions ||--o{ role_permissions : includes
+
+' ==================================================
+' RELATIONSHIPS: HR
+' ==================================================
+
+enterprises ||--o{ departments : has
+enterprises ||--o{ positions : defines
+enterprises ||--o{ employees : employs
+
+users |o--o| employees : account
+departments ||--o{ employees : groups
+positions ||--o{ employees : assigns
+
+' ==================================================
+' RELATIONSHIPS: PAYROLL
+' ==================================================
+
+enterprises ||--o{ payroll_periods : schedules
+enterprises ||--o{ payroll_runs : manages
+enterprises ||--o{ payroll_components : defines
+
+payroll_periods ||--o{ payroll_runs : generates
+users |o--o{ payroll_runs : processes
+
+payroll_runs ||--o{ payroll_records : contains
+employees ||--o{ payroll_records : receives
+
+payroll_records ||--o{ payroll_items : breaks_down
+payroll_components ||--o{ payroll_items : categorizes
+
+payroll_runs ||--o{ payroll_milestones : tracks
+users |o--o{ payroll_milestones : assigned
+
+@enduml
